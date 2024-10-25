@@ -101,13 +101,13 @@ async def simple_api_key_auth(request, handler):
     if not request.headers['Authorization'].startswith('Bearer '):
         return web.json_response({'error': 'Bearer token required'}, status=401)
     # Check if the token is valid
-    if request.headers['Authorization'] != 'Bearer ' + os.getenv('API_KEY'):
+    if request.headers['Authorization'] != 'Bearer ' + os.getenv('AGENT_PASSWORD'):
         return web.json_response({'error': 'Invalid token'}, status=401)
     return await handler(request)
 
 
 # Add the middleware to the app
-if os.getenv('API_KEY') is not None:
+if os.getenv('AGENT_PASSWORD') is not None:
     app.middlewares.append(simple_api_key_auth)
 
 
