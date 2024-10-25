@@ -104,6 +104,9 @@ install_using_go() {
 }
 
 setup_agent_comfy() {
+    # Initialize/reset .env file
+    : > .env
+
     # Reusable style function for headers
     style_header() {
         gum style \
@@ -137,6 +140,11 @@ setup_agent_comfy() {
         gum input "${input_args[@]}"
     }
 
+    # Reusable function to write to .env
+    write_env() {
+        echo "$1=$2" >> .env
+    }
+
     # Model selection setup
     style_header "ComfyUI Model Selection"
     gum style --foreground="#CCCCCC" "Select which functionality you would like to support:"
@@ -163,31 +171,22 @@ setup_agent_comfy() {
 
     # Process selections
     SELECTED_MODEL_IDS=""
-    NEEDS_CIVITAI=false
 
     for option in "${SELECTED_OPTIONS[@]}"; do
         option=$(echo "$option" | xargs)
         [ -n "$SELECTED_MODEL_IDS" ] && SELECTED_MODEL_IDS+=","
         SELECTED_MODEL_IDS+="${MODEL_OPTIONS[$option]}"
-        [ "$option" = "Text & Image to Image (SDXL)" ] && NEEDS_CIVITAI=true
+
     done
 
-    # Handle CivitAI token if needed
-    [ "$NEEDS_CIVITAI" = true ] && {
-      style_header "CivitAI API Key"
-        CIVITAI_TOKEN=$(get_input "Enter your CivitAI token for downloading models" "" "true" "Enter your CivitAI token")
-        [ -n "$CIVITAI_TOKEN" ] && echo "CIVITAI_TOKEN=$CIVITAI_TOKEN" >> .env
-    }
-
     # Save selected models
-    echo "DEFAULT_MODELS=$SELECTED_MODEL_IDS" >> .env
+    write_env "DEFAULT_MODELS" "$SELECTED_MODEL_IDS"
     echo "Note: Selected models will be downloaded on first run. This can take a while depending on your internet connection."
 
     # Server configuration
     style_header "AI Server Configuration"
     DEFAULT_SERVER_URL=${AI_SERVER_URL:-"http://localhost:5006"}
     AI_SERVER_URL=$(get_input "Enter the URL where your AI Server is running." "$DEFAULT_SERVER_URL" "" "http://your-server:5006")
-    echo "AI Server URL: $AI_SERVER_URL"
 
     DEFAULT_AUTH=${AI_SERVER_API_KEY:-$AI_SERVER_AUTH_SECRET}
     SERVER_AUTH=$(get_input "Enter your AI Server authentication credentials." "$DEFAULT_AUTH" "true" "Enter API Key or Auth Secret")
@@ -223,11 +222,9 @@ setup_agent_comfy() {
 
     style_header "✓ Successfully registered ComfyUI Agent with AI Server"
 
-    # Save configuration
-    {
-        echo "AGENT_URL=$AGENT_URL"
-        echo "AGENT_PASSWORD=$AGENT_PASSWORD"
-    } >> .env
+    # Save agent configuration
+    write_env "AGENT_URL" "$AGENT_URL"
+    write_env "AGENT_PASSWORD" "$AGENT_PASSWORD"
 }
 
 # Run the prerequisites check function
