@@ -104,25 +104,45 @@ install_using_go() {
 }
 
 setup_agent_comfy() {
-    # Add styled header for model selection
-    gum style \
-        --foreground="#00FFFF" \
-        --border-foreground="#00FFFF" \
-        --border double \
-        --align center \
-        --width 50 \
-        "ComfyUI Model Selection"
+    # Reusable style function for headers
+    style_header() {
+        gum style \
+            --foreground="#00FFFF" \
+            --border-foreground="#00FFFF" \
+            --border double \
+            --align center \
+            --width 50 \
+            "$1"
+    }
 
-    gum style \
-        --foreground="#CCCCCC" \
-        "Select which functionality you would like to support:"
+    # Reusable input prompt function
+    get_input() {
+        local prompt="$1"
+        local default="$2"
+        local is_password="$3"
+        local placeholder="$4"
 
-    gum style \
-        --foreground="#888888" \
-        --italic \
-        "Use space to select, enter to confirm"
+        echo
+        gum style --foreground="#CCCCCC" "$prompt"
+        [ -n "$default" ] && gum style --foreground="#888888" "Default: $default"
 
-    # Define model options with their IDs
+        local input_args=(
+            --value "${default:-}"
+            --placeholder "$placeholder"
+            --prompt "> "
+            --prompt.foreground="#00FFFF"
+        )
+        [ "$is_password" = "true" ] && input_args+=(--password)
+
+        gum input "${input_args[@]}"
+    }
+
+    # Model selection setup
+    style_header "ComfyUI Model Selection"
+    gum style --foreground="#CCCCCC" "Select which functionality you would like to support:"
+    gum style --foreground="#888888" --italic "Use space to select, enter to confirm"
+
+    # Define model options
     declare -A MODEL_OPTIONS=(
         ["Text & Image to Image (SDXL)"]="sdxl-lightning,jib-mix-realistic"
         ["Text to Image (Flux.Schnell)"]="flux-schnell"
@@ -132,188 +152,78 @@ setup_agent_comfy() {
         ["Image to Text (Florence2)"]="image-to-text"
     )
 
-    # Convert options to array for gum choose
-    OPTIONS=()
-    for key in "${!MODEL_OPTIONS[@]}"; do
-        OPTIONS+=("$key")
-    done
+    # Get user selections
+    mapfile -t SELECTED_OPTIONS < <(gum choose --no-limit --height 10 --cursor.foreground="#FFA500" "${!MODEL_OPTIONS[@]}")
 
-    # Use gum choose with --no-limit flag for checkbox-like selection
-    TEMP_FILE=$(mktemp)
-    gum choose --no-limit --height 10 --cursor.foreground="#FFA500" "${OPTIONS[@]}" > "$TEMP_FILE"
+    # Exit if no selection
+    [ ${#SELECTED_OPTIONS[@]} -eq 0 ] || [ -z "${SELECTED_OPTIONS[0]}" ] && {
+        echo "No functionality selected. Exiting setup."
+        exit 1
+    }
 
-    # Read selected options into an array, handling multi-line output correctly
-    mapfile -t SELECTED_OPTIONS < "$TEMP_FILE"
-    rm "$TEMP_FILE"
-
-    # Process selected options
+    # Process selections
     SELECTED_MODEL_IDS=""
     NEEDS_CIVITAI=false
 
-    echo "Selected options: ${SELECTED_OPTIONS[@]}"
-
-    # Check if any options were selected
-    if [ ${#SELECTED_OPTIONS[@]} -eq 0 ] || [ -z "${SELECTED_OPTIONS[0]}" ]; then
-        echo "No functionality selected. Exiting setup."
-        exit 1
-    fi
-
     for option in "${SELECTED_OPTIONS[@]}"; do
-        # Trim any whitespace from the option
         option=$(echo "$option" | xargs)
-
-        if [ -n "$SELECTED_MODEL_IDS" ]; then
-            SELECTED_MODEL_IDS="${SELECTED_MODEL_IDS},"
-        fi
-        SELECTED_MODEL_IDS="${SELECTED_MODEL_IDS}${MODEL_OPTIONS[$option]}"
-
-        # Check if SDXL was selected
-        if [ "$option" = "Text & Image to Image (SDXL)" ]; then
-            NEEDS_CIVITAI=true
-        fi
+        [ -n "$SELECTED_MODEL_IDS" ] && SELECTED_MODEL_IDS+=","
+        SELECTED_MODEL_IDS+="${MODEL_OPTIONS[$option]}"
+        [ "$option" = "Text & Image to Image (SDXL)" ] && NEEDS_CIVITAI=true
     done
 
-    # If no options were selected, exit
-    if [ -z "$SELECTED_MODEL_IDS" ]; then
-        echo "No functionality selected. Exiting setup."
-        exit 1
-    fi
+    # Handle CivitAI token if needed
+    [ "$NEEDS_CIVITAI" = true ] && {
+      style_header "CivitAI API Key"
+        CIVITAI_TOKEN=$(get_input "Enter your CivitAI token for downloading models" "" "true" "Enter your CivitAI token")
+        [ -n "$CIVITAI_TOKEN" ] && echo "CIVITAI_TOKEN=$CIVITAI_TOKEN" >> .env
+    }
 
-    # Ask for CivitAI token if SDXL was selected
-    if [ "$NEEDS_CIVITAI" = true ]; then
-        CIVITAI_TOKEN=$(gum input --password --placeholder "Enter your CivitAI token for downloading models")
-        if [ -n "$CIVITAI_TOKEN" ]; then
-            echo "CIVITAI_TOKEN=$CIVITAI_TOKEN" >> .env
-        fi
-    fi
-
-    # Save selected model IDs to .env file
+    # Save selected models
     echo "DEFAULT_MODELS=$SELECTED_MODEL_IDS" >> .env
-
     echo "Note: Selected models will be downloaded on first run. This can take a while depending on your internet connection."
 
-    # Get AI Server URL with better prompting
+    # Server configuration
+    style_header "AI Server Configuration"
     DEFAULT_SERVER_URL=${AI_SERVER_URL:-"http://localhost:5006"}
-    echo "Configure AI Server Connection"
-    gum style \
-        --foreground="#00FFFF" \
-        --border-foreground="#00FFFF" \
-        --border double \
-        --align center \
-        --width 50 \
-        "AI Server Configuration"
+    AI_SERVER_URL=$(get_input "Enter the URL where your AI Server is running." "$DEFAULT_SERVER_URL" "" "http://your-server:5006")
+    echo "AI Server URL: $AI_SERVER_URL"
 
-    gum style \
-        --foreground="#CCCCCC" \
-        "Enter the URL where your AI Server is running."
-
-    gum style --foreground="#888888" "Default: $DEFAULT_SERVER_URL"
-
-    AI_SERVER_URL=$(gum input \
-        --value "$DEFAULT_SERVER_URL" \
-        --placeholder "http://your-server:5006" \
-        --prompt "> " \
-        --prompt.foreground="#00FFFF")
-
-    # Get AI Server authentication with improved formatting
     DEFAULT_AUTH=${AI_SERVER_API_KEY:-$AI_SERVER_AUTH_SECRET}
-    echo
-    gum style \
-        --foreground="#CCCCCC" \
-        "Enter your AI Server authentication credentials."
+    SERVER_AUTH=$(get_input "Enter your AI Server authentication credentials." "$DEFAULT_AUTH" "true" "Enter API Key or Auth Secret")
 
-    gum style \
-        --foreground="#888888" \
-        --italic \
-        "Note: You can create an API key via the Admin UI if you don't have one"
+    # Agent configuration
+    style_header "ComfyUI Agent Configuration"
+    AGENT_URL=$(get_input "Enter the URL where this ComfyUI Agent will be accessible." "http://localhost:7860" "" "http://your-agent:7860")
+    AGENT_PASSWORD=$(get_input "Create a password to secure your ComfyUI Agent." "" "true" "Enter a secure password")
 
-    SERVER_AUTH=$(gum input \
-        --password \
-        --value "$DEFAULT_AUTH" \
-        --placeholder "Enter API Key or Auth Secret" \
-        --prompt "> " \
-        --prompt.foreground="#00FFFF")
+    # Prepare and send API request
+    IFS=',' read -ra MODEL_IDS <<< "$SELECTED_MODEL_IDS"
+    MODELS_JSON=$(printf '"%s",' "${MODEL_IDS[@]}" | sed 's/,$//')
 
-    # Get Agent URL with improved formatting
-    echo
-    gum style \
-        --foreground="#00FFFF" \
-        --border-foreground="#00FFFF" \
-        --border double \
-        --align center \
-        --width 50 \
-        "ComfyUI Agent Configuration"
-
-    gum style \
-        --foreground="#CCCCCC" \
-        "Enter the URL where this ComfyUI Agent will be accessible."
-
-    gum style \
-        --foreground="#888888" \
-        "Default: http://localhost:7860"
-
-    AGENT_URL=$(gum input \
-        --value "http://localhost:7860" \
-        --placeholder "http://your-agent:7860" \
-        --prompt "> " \
-        --prompt.foreground="#00FFFF")
-
-    # Get Agent password with improved formatting
-    echo
-    gum style \
-        --foreground="#CCCCCC" \
-        "Create a password to secure your ComfyUI Agent."
-
-    AGENT_PASSWORD=$(gum input \
-        --password \
-        --placeholder "Enter a secure password" \
-        --prompt "> " \
-        --prompt.foreground="#00FFFF")
-
-    # Fix the JSON array construction for the API call
-    # Convert selected model IDs to a proper JSON array
-    MODEL_IDS_ARRAY=()
-    IFS=',' read -ra ADDR <<< "$SELECTED_MODEL_IDS"
-    for model_id in "${ADDR[@]}"; do
-        MODEL_IDS_ARRAY+=("\"$model_id\"")
-    done
-    MODELS_JSON=$(printf '%s,' "${MODEL_IDS_ARRAY[@]}" | sed 's/,$//')
-
-    # Prepare the API request payload with properly formatted JSON
-    JSON_PAYLOAD=$(cat <<EOF
-{
-    "name": "ComfyUI Agent",
-    "apiKey": "$AGENT_PASSWORD",
-    "apiBaseUrl": "$AGENT_URL",
-    "models": [$MODELS_JSON],
-    "mediaTypeId": "ComfyUI"
-}
-EOF
-)
-
-    # Make the API call to register the provider
     RESPONSE=$(curl -s -X POST \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $SERVER_AUTH" \
-        -d "$JSON_PAYLOAD" \
+        -d '{
+            "name": "ComfyUI Agent",
+            "apiKey": "'"$AGENT_PASSWORD"'",
+            "apiBaseUrl": "'"$AGENT_URL"'",
+            "models": ['"$MODELS_JSON"'],
+            "mediaTypeId": "ComfyUI",
+            "enabled": true
+        }' \
         "$AI_SERVER_URL/api/CreateMediaProvider")
 
-    # Check if the API call was successful
+    # Check response and save configuration
     if echo "$RESPONSE" | grep -q "error\|Error\|ERROR"; then
         echo "Error registering media provider with AI Server:"
         echo "$RESPONSE"
         exit 1
-    else
-        gum style \
-            --foreground="#00FF00" \
-            --border-foreground="#00FF00" \
-            --border normal \
-            --align center \
-            --width 50 \
-            "Successfully registered ComfyUI Agent with AI Server"
     fi
 
-    # Save configuration to .env file
+    style_header "✓ Successfully registered ComfyUI Agent with AI Server"
+
+    # Save configuration
     {
         echo "AGENT_URL=$AGENT_URL"
         echo "AGENT_PASSWORD=$AGENT_PASSWORD"
