@@ -1,0 +1,11 @@
+services:
+  comfy:
+    build: ./comfy/
+    image: comfy-agent:latest
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./data/config:/data
+      - ./output:/output
+    environment:
+      - CLI_ARGS=--cpu

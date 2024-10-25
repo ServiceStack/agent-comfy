@@ -1,0 +1,24 @@
+services:
+  comfy:
+    image: servicestack/agent-comfy:latest
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./data/models:/data/models
+      - ./data/input:/data/input
+      - ./data/.cache:/data/.cache
+      - ./data/embeddings:/data/embeddings
+      - ./data/output:/data/output
+      - ./data/config:/data/config
+    environment:
+      - CLI_ARGS=--output-directory /data/output --temp-directory /data/output/temp
+    env_file:
+      - path: .env
+        required: false
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
