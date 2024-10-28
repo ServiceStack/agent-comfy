@@ -232,6 +232,7 @@ setup_agent_comfy() {
     declare -A MODEL_OPTIONS=(
         ["Text & Image to Image (SDXL)"]="sdxl-lightning,jib-mix-realistic"
         ["Text to Image (Flux.Schnell)"]="flux-schnell"
+        ["Text to Image (SD 3.5)"]="sd-3.5-fp8"
         ["Image Upscale (RealESRGAN_x2)"]="image-upscale-2x"
         ["Speech to Text (Whisper)"]="speech-to-text"
         ["Text to Speech (Piper TTS)"]="text-to-speech"
