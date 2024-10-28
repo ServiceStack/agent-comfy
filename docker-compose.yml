@@ -1,6 +1,7 @@
 services:
   comfy:
     image: servicestack/agent-comfy:latest
+    container_name: agent_comfy
     ports:
       - "7860:7860"
     volumes:
