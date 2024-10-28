@@ -1,8 +1,11 @@
 FROM pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive PIP_PREFER_BINARY=1
+RUN apt-get update && \
+apt-get install -y software-properties-common && \
+add-apt-repository ppa:ubuntuhandbook1/ffmpeg7 -y
 
-RUN apt-get update && apt-get install -y git wget jq curl ffmpeg && apt-get clean
+RUN apt-get update && apt-get install -y git wget jq ffmpeg curl && apt-get clean
 ENV ROOT=/stable-diffusion
 ENV DATA=/data
 RUN mkdir -p ${DATA}/custom_nodes
@@ -57,10 +60,11 @@ RUN mkdir -p /data/.cache /data/input /data/output /data/custom_nodes /data/mode
     /data/models/VAE /data/models/checkpoints /data/models/clip
 
 
-
 WORKDIR ${ROOT}
 
 ENV NVIDIA_VISIBLE_DEVICES=all PYTHONPATH="${PYTHONPATH}:${PWD}" CLI_ARGS=""
+ENV PATH="/usr/bin:${PATH}"
+
 EXPOSE 7860
 ENTRYPOINT ["/docker/entrypoint.sh"]
 CMD python -u main.py --listen --port 7860 ${CLI_ARGS}
