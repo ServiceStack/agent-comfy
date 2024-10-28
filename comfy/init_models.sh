@@ -95,17 +95,20 @@ resolve_dependencies() {
     echo "${resolved_models[@]}"
 }
 
-# Array of URLs to process
-urls=(
-    "https://raw.githubusercontent.com/ServiceStack/ai-server/main/AiServer/wwwroot/lib/data/media-models.json"
-)
+# Path to local JSON file
+file="/data/config/models.json"
+url="https://raw.githubusercontent.com/ServiceStack/ai-server/main/AiServer/wwwroot/lib/data/media-models.json"
 
-# Collect all items from JSON files
-all_models=$(
-    for url in "${urls[@]}"; do
-        curl -s "$url"
-    done | jq -s 'add'
-)
+# Check if file exists, if not download it, this is a backup in case the installer doesn't download the file
+if [ ! -f "$file" ]; then
+    # Create directory structure if it doesn't exist
+    mkdir -p "$(dirname "$file")"
+    # Download and save the file
+    curl -s "$url" > "$file"
+fi
+
+# Read JSON from local file
+all_models=$(jq '.' "$file")
 
 # Resolve DEFAULT_MODELS with dependencies
 if [[ -n "$DEFAULT_MODELS" ]]; then

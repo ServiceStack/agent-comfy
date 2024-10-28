@@ -145,8 +145,9 @@ check_comfy_status() {
 # Function to handle server configuration and API registration
 configure_server_and_register() {
     local selected_model_ids="$1"
-    local agent_url="$2"
-    local agent_password="$3"
+    local selected_api_models="$2"
+    local agent_url="$3"
+    local agent_password="$4"
     local success=false
 
     while [ "$success" = false ]; do
@@ -159,8 +160,9 @@ configure_server_and_register() {
         SERVER_AUTH=$(get_input "Enter your AI Server authentication credentials." "$DEFAULT_AUTH" "true" "Enter API Key or Auth Secret")
 
         # Prepare API request
-        IFS=',' read -ra MODEL_IDS <<< "$selected_model_ids"
-        MODELS_JSON=$(printf '"%s",' "${MODEL_IDS[@]}" | sed 's/,$//')
+        # Convert API models string to array and format for JSON
+        IFS=',' read -ra API_MODELS <<< "$selected_api_models"
+        MODELS_JSON=$(printf '"%s",' "${API_MODELS[@]}" | sed 's/,$//')
 
         # Create request JSON
         REQUEST_JSON=$(cat <<EOF
@@ -208,6 +210,24 @@ EOF
     done
 }
 
+persist_models_config() {
+  # Path to local JSON file
+  file="./data/config/models.json"
+  url="https://raw.githubusercontent.com/ServiceStack/ai-server/main/AiServer/wwwroot/lib/data/media-models.json"
+
+  curl -s "$url" > "$file"
+}
+
+persist_models_config() {
+    # Path to local JSON file
+    file="./data/config/models.json"
+    url="https://raw.githubusercontent.com/ServiceStack/ai-server/main/AiServer/wwwroot/lib/data/media-models.json"
+
+    # Ensure directory exists
+    mkdir -p "$(dirname "$file")"
+    curl -s "$url" > "$file"
+}
+
 setup_agent_comfy() {
     # Initialize/reset .env file
     : > .env
@@ -223,24 +243,47 @@ setup_agent_comfy() {
             "$1"
     }
 
+    # Persist models configuration
+    persist_models_config
+
     # Model selection setup
     style_header "ComfyUI Model Selection"
     gum style --foreground="#CCCCCC" "Select which functionality you would like to support:"
     gum style --foreground="#888888" --italic "Use space to select, enter to confirm"
 
-    # Define model options
-    declare -A MODEL_OPTIONS=(
-        ["Text & Image to Image (SDXL)"]="sdxl-lightning,jib-mix-realistic"
-        ["Text to Image (Flux.Schnell)"]="flux-schnell"
-        ["Text to Image (SD 3.5)"]="sd-3.5-fp8"
-        ["Image Upscale (RealESRGAN_x2)"]="image-upscale-2x"
-        ["Speech to Text (Whisper)"]="speech-to-text"
-        ["Text to Speech (Piper TTS)"]="text-to-speech"
-        ["Image to Text (Florence2)"]="image-to-text"
-    )
+    # Read and parse the JSON file
+    if ! [ -f "./data/config/models.json" ]; then
+        echo "Error: models.json file not found"
+        exit 1
+    fi
+
+    # Create arrays to store menu options and their corresponding values
+    declare -a MENU_OPTIONS=()
+    declare -A MODEL_MAPPINGS=()
+    declare -A COMFY_API_MODELS=()
+
+    # Parse JSON and populate arrays
+    while IFS= read -r line; do
+        if [[ $line == *"installer"* ]] && [[ $line == *"name"* ]]; then
+            # Extract installer name and corresponding model ID
+            name=$(echo "$line" | jq -r '.installer.name')
+            id=$(echo "$line" | jq -r '.id')
+            comfy_model=$(echo "$line" | jq -r '.apiModels.ComfyUI // empty')
+
+            if [ -n "$name" ] && [ -n "$id" ]; then
+                MENU_OPTIONS+=("$name")
+                MODEL_MAPPINGS["$name"]="$id"
+
+                # Store ComfyUI API model if it exists
+                if [ -n "$comfy_model" ]; then
+                    COMFY_API_MODELS["$id"]="$comfy_model"
+                fi
+            fi
+        fi
+    done < <(jq -c '.[]' "./data/config/models.json")
 
     # Get user selections
-    mapfile -t SELECTED_OPTIONS < <(gum choose --no-limit --height 10 --cursor.foreground="#FFA500" "${!MODEL_OPTIONS[@]}")
+    mapfile -t SELECTED_OPTIONS < <(gum choose --no-limit --height 10 --cursor.foreground="#FFA500" "${MENU_OPTIONS[@]}")
 
     # Exit if no selection
     [ ${#SELECTED_OPTIONS[@]} -eq 0 ] || [ -z "${SELECTED_OPTIONS[0]}" ] && {
@@ -248,18 +291,30 @@ setup_agent_comfy() {
         exit 1
     }
 
-    # Process selections
+    # Process selections for DEFAULT_MODELS
     SELECTED_MODEL_IDS=""
+    # Process selections for API_MODELS
+    SELECTED_API_MODELS=""
 
     for option in "${SELECTED_OPTIONS[@]}"; do
         option=$(echo "$option" | xargs)
-        [ -n "$SELECTED_MODEL_IDS" ] && SELECTED_MODEL_IDS+=","
-        SELECTED_MODEL_IDS+="${MODEL_OPTIONS[$option]}"
 
+        # Add to DEFAULT_MODELS
+        [ -n "$SELECTED_MODEL_IDS" ] && SELECTED_MODEL_IDS+=","
+        SELECTED_MODEL_IDS+="${MODEL_MAPPINGS[$option]}"
+
+        # Add to API_MODELS if it has ComfyUI configuration
+        model_id="${MODEL_MAPPINGS[$option]}"
+        if [ -n "${COMFY_API_MODELS[$model_id]}" ]; then
+            [ -n "$SELECTED_API_MODELS" ] && SELECTED_API_MODELS+=","
+            SELECTED_API_MODELS+="${COMFY_API_MODELS[$model_id]}"
+        fi
     done
 
     # Save selected models
     write_env "DEFAULT_MODELS" "$SELECTED_MODEL_IDS"
+    write_env "API_MODELS" "$SELECTED_API_MODELS"
+
     echo "Note: Selected models will be downloaded on first run. This can take a while depending on your internet connection."
 
     # Agent configuration
@@ -269,11 +324,13 @@ setup_agent_comfy() {
 
     # Save agent configuration
     write_env "AGENT_URL" "$AGENT_URL"
-    echo "$AGENT_PASSWORD"
     write_env "AGENT_PASSWORD" "$AGENT_PASSWORD"
-    # Configure server and register agent (will retry on failure)
-    configure_server_and_register "$SELECTED_MODEL_IDS" "$AGENT_URL" "$AGENT_PASSWORD"
 
+    # Configure server and register agent (will retry on failure)
+    configure_server_and_register "$SELECTED_MODEL_IDS" "$SELECTED_API_MODELS" "$AGENT_URL" "$AGENT_PASSWORD"
+
+    # Ensure latest version of ComfyUI Agent docker image
+    docker compose pull
     # Start the ComfyUI Agent
     docker compose up -d
 
