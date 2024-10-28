@@ -1,6 +1,6 @@
 services:
   comfy:
-    image: servicestack/agent-comfy:latest
+    build: ./comfy
     ports:
       - "7860:7860"
     volumes:
