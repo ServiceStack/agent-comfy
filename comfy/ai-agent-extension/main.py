@@ -16,6 +16,7 @@ routes = prompt_server.routes
 # tts and others are not included by default
 folder_paths.add_model_folder_path('tts', '/data/models/tts')
 folder_paths.add_model_folder_path('LLM', '/data/models/LLM')
+folder_paths.add_model_folder_path('tts', '/data/models/piper_tts')
 
 
 # Get the primary download path, if array, get first, else return the path
@@ -36,12 +37,14 @@ async def engines_list(request):
     all_unets = folder_paths.get_filename_list("diffusion_models")
     all_tts = folder_paths.get_filename_list("tts")
     all_llms = folder_paths.get_filename_list("LLM")
+    if all_llms is None:
+        all_llms = ['Florence-2-base']
     all_upscale = folder_paths.get_filename_list("upscale_models")
     # all_sst is different as it needs to list all files from `~/.cache/whisper/`
     if os.path.exists(os.path.expanduser('~/.cache/whisper/')):
         all_sst = os.listdir(os.path.expanduser('~/.cache/whisper/'))
     else:
-        all_sst = []
+        all_sst = ['base', 'tiny', 'small', 'medium', 'large']
 
     # Combine all models and unets
     all_models.extend(all_unets)

@@ -99,7 +99,7 @@ resolve_dependencies() {
 file="/data/config/models.json"
 url="https://raw.githubusercontent.com/ServiceStack/ai-server/main/AiServer/wwwroot/lib/data/media-models.json"
 
-# Check if file exists, if not download it, this is a backup in case the installer doesn't download the file
+# Check if file exists, if not download it
 if [ ! -f "$file" ]; then
     # Create directory structure if it doesn't exist
     mkdir -p "$(dirname "$file")"
