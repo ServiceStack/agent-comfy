@@ -6,7 +6,6 @@ services:
   comfy:
     image: servicestack/agent-comfy:latest
     container_name: agent-comfy
-    network_mode: "bridge"
     ports:
       - "7860:7860"
     volumes:
