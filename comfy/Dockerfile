@@ -17,7 +17,7 @@ RUN echo "Downloading image captioning support module..." && \
     cd ${DATA}/custom_nodes && \
     git clone https://github.com/kijai/ComfyUI-Florence2.git ${DATA}/custom_nodes/ComfyUI-Florence2 && \
     cd ${DATA}/custom_nodes/ComfyUI-Florence2 && \
-    git reset --hard 375b92e5f6c0e07922b87cd68561c10f69ed257e && \
+    git reset --hard ea0cc52627a68ab66e6252bc8d2987bb87c4f5f5 && \
     pip install -r requirements.txt && \
     pip install accelerate==0.31.0
 
