@@ -339,7 +339,7 @@ setup_agent_comfy() {
     # Start the ComfyUI Agent
     docker compose up -d
 
-    style_header "✓ Successfully registered ComfyUI Agent with AI Server"
+    style_header "Agent starting... Selected models will be downloaded on first run. This can take a while depending on your internet connection."
 }
 
 # Run the prerequisites check function
