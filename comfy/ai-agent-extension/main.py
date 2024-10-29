@@ -38,13 +38,13 @@ async def engines_list(request):
     all_tts = folder_paths.get_filename_list("tts")
     all_llms = folder_paths.get_filename_list("LLM")
     if all_llms is None:
-        all_llms = ['Florence-2-base']
+        all_llms = []
     all_upscale = folder_paths.get_filename_list("upscale_models")
     # all_sst is different as it needs to list all files from `~/.cache/whisper/`
     if os.path.exists(os.path.expanduser('~/.cache/whisper/')):
         all_sst = os.listdir(os.path.expanduser('~/.cache/whisper/'))
     else:
-        all_sst = ['base', 'tiny', 'small', 'medium', 'large']
+        all_sst = []
 
     # Combine all models and unets
     all_models.extend(all_unets)
