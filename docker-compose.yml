@@ -1,3 +1,7 @@
+networks:
+  ai-services:
+    external: true
+
 services:
   comfy:
     image: servicestack/agent-comfy:latest
