@@ -150,6 +150,11 @@ configure_server_and_register() {
     local agent_password="$4"
     local success=false
 
+    # Extract domain from agent_url
+    # Split on // and take everything after it
+    local domain=$(echo "$agent_url" | sed 's|.*//||')
+    local agent_name="ComfyUI Agent - ${domain}"
+
     while [ "$success" = false ]; do
         # Server configuration
         style_header "AI Server Configuration"
@@ -167,7 +172,7 @@ configure_server_and_register() {
         # Create request JSON
         REQUEST_JSON=$(cat <<EOF
 {
-    "name": "ComfyUI Agent",
+    "name": "${agent_name}",
     "apiKey": "${agent_password}",
     "apiBaseUrl": "${agent_url}",
     "models": [${MODELS_JSON}],
