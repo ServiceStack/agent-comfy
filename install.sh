@@ -318,17 +318,16 @@ setup_agent_comfy() {
 
     # Save selected models
     write_env "DEFAULT_MODELS" "$SELECTED_MODEL_IDS"
-    write_env "API_MODELS" "$SELECTED_API_MODELS"
 
     echo "Note: Selected models will be downloaded on first run. This can take a while depending on your internet connection."
 
     # Agent configuration
     style_header "ComfyUI Agent Configuration"
-    AGENT_URL=$(get_input "Enter the URL where this ComfyUI Agent will be accessible." "http://localhost:7860" "" "http://your-agent:7860")
+    DEFAULT_AGENT_URL=${AGENT_URL:-"http://localhost:7860"}
+    AGENT_URL=$(get_input "Enter the URL where this ComfyUI Agent will be accessible." "$DEFAULT_AGENT_URL" "" "http://your-agent:7860")
     AGENT_PASSWORD=$(get_input "Create a password to secure your ComfyUI Agent." "" "true" "Enter a secure password")
 
     # Save agent configuration
-    write_env "AGENT_URL" "$AGENT_URL"
     write_env "AGENT_PASSWORD" "$AGENT_PASSWORD"
 
     # Configure server and register agent (will retry on failure)
