@@ -253,7 +253,7 @@ setup_agent_comfy() {
     if ! [ -f "./data/config/models.json" ]; then
         echo "Error: models.json file not found"
         exit 1
-    }
+    fi
 
     # Create arrays to store menu options and their corresponding values
     declare -a MENU_OPTIONS=()
