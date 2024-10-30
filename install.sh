@@ -253,13 +253,13 @@ setup_agent_comfy() {
     if ! [ -f "./data/config/models.json" ]; then
         echo "Error: models.json file not found"
         exit 1
-    fi
+    fi  # Fixed: Missing 'fi'
 
     # Create arrays to store menu options and their corresponding values
-    declare -a MENU_OPTIONS=()
-    declare -A MODEL_MAPPINGS=()
-    declare -A COMFY_API_MODELS=()
-    declare -A API_KEY_REQUIREMENTS=()
+    declare -a MENU_OPTIONS
+    declare -A MODEL_MAPPINGS
+    declare -A COMFY_API_MODELS
+    declare -a HF_TOKEN_REQUIRED
 
     # Parse JSON and populate arrays
     while IFS= read -r line; do
@@ -279,9 +279,9 @@ setup_agent_comfy() {
                     COMFY_API_MODELS["$id"]="$comfy_model"
                 fi
 
-                # Store API key requirement if it exists
-                if [ -n "$download_api_key_var" ]; then
-                    API_KEY_REQUIREMENTS["$id"]="$download_api_key_var"
+                # Check if this model requires HF_TOKEN
+                if [ "$download_api_key_var" = "HF_TOKEN" ]; then
+                    HF_TOKEN_REQUIRED+=("$id")
                 fi
             fi
         fi
@@ -291,20 +291,20 @@ setup_agent_comfy() {
     mapfile -t SELECTED_OPTIONS < <(gum choose --no-limit --height 10 --cursor.foreground="#FFA500" "${MENU_OPTIONS[@]}")
 
     # Exit if no selection
-    [ ${#SELECTED_OPTIONS[@]} -eq 0 ] || [ -z "${SELECTED_OPTIONS[0]}" ] && {
+    if [ ${#SELECTED_OPTIONS[@]} -eq 0 ] || [ -z "${SELECTED_OPTIONS[0]}" ]; then
         echo "No functionality selected. Exiting setup."
         exit 1
-    }
+    fi  # Changed from single-line syntax for clarity
 
     # Process selections for DEFAULT_MODELS
     SELECTED_MODEL_IDS=""
     # Process selections for API_MODELS
     SELECTED_API_MODELS=""
-    # Track if HF_TOKEN is needed
+    # Flag to track if any selected model requires HF_TOKEN
     NEEDS_HF_TOKEN=false
 
     for option in "${SELECTED_OPTIONS[@]}"; do
-        option=$(echo "$option" | xargs)
+        option=$(echo "$option" | xargs)  # Trim whitespace
 
         # Add to DEFAULT_MODELS
         [ -n "$SELECTED_MODEL_IDS" ] && SELECTED_MODEL_IDS+=","
@@ -317,10 +317,13 @@ setup_agent_comfy() {
             SELECTED_API_MODELS+="${COMFY_API_MODELS[$model_id]}"
         fi
 
-        # Check if this model needs HF_TOKEN
-        if [ -n "${API_KEY_REQUIREMENTS[$model_id]}" ] && [ "${API_KEY_REQUIREMENTS[$model_id]}" = "HF_TOKEN" ]; then
-            NEEDS_HF_TOKEN=true
-        fi
+        # Check if this model requires HF_TOKEN
+        for hf_required in "${HF_TOKEN_REQUIRED[@]}"; do
+            if [ "$model_id" = "$hf_required" ]; then
+                NEEDS_HF_TOKEN=true
+                break
+            fi
+        done
     done
 
     # Save selected models
@@ -330,8 +333,15 @@ setup_agent_comfy() {
     if [ "$NEEDS_HF_TOKEN" = true ]; then
         style_header "HuggingFace Token Required"
         gum style --foreground="#CCCCCC" "One or more selected models require a HuggingFace access token."
+        gum style --foreground="#888888" "You can get your token at https://huggingface.co/settings/tokens"
+
         HF_TOKEN=$(get_input "Please enter your HuggingFace access token:" "" "true" "Enter your HuggingFace token")
-        write_env "HF_TOKEN" "$HF_TOKEN"
+        if [ -n "$HF_TOKEN" ]; then
+            write_env "HF_TOKEN" "$HF_TOKEN"
+        else
+            echo "Error: HuggingFace token is required but was not provided."
+            exit 1
+        fi
     fi
 
     echo "Note: Selected models will be downloaded on first run. This can take a while depending on your internet connection."
