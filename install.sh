@@ -358,6 +358,9 @@ setup_agent_comfy() {
     # Configure server and register agent (will retry on failure)
     configure_server_and_register "$SELECTED_MODEL_IDS" "$SELECTED_API_MODELS" "$AGENT_URL" "$AGENT_PASSWORD"
 
+    # Create ai-services network if it doesn't exist
+    docker network create ai-services &> /dev/null || true
+
     # Ensure latest version of ComfyUI Agent docker image
     docker compose pull
     # Start the ComfyUI Agent
