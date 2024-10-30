@@ -35,7 +35,7 @@ RUN echo "Downloading text to speech support extension..." && \
 
 # Clone and setup ComfyUI
 RUN --mount=type=cache,target=/root/.cache/pip \
-  git clone --depth 1 --branch v0.2.4 https://github.com/comfyanonymous/ComfyUI.git ${ROOT} && \
+  git clone --depth 1 --branch v0.2.5 https://github.com/comfyanonymous/ComfyUI.git ${ROOT} && \
   cd ${ROOT} && \
   pip install -r requirements.txt && \
   rm -rf ${ROOT}/input ${ROOT}/output ${ROOT}/custom_nodes ${ROOT}/models
