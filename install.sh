@@ -190,27 +190,55 @@ EOF
         echo "Request body:"
         echo "$REQUEST_JSON"
 
-        # Send request
-        RESPONSE=$(curl -s -X POST \
+        # Create a temporary file for headers
+        HEADER_FILE=$(mktemp)
+
+        # Send request and save headers to temp file
+        RESPONSE=$(curl -s -w "%{http_code}" \
+            -D "${HEADER_FILE}" \
+            -X POST \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $SERVER_AUTH" \
             -d "$REQUEST_JSON" \
             "$AI_SERVER_URL/api/CreateMediaProvider")
 
-        # Check response
-        if echo "$RESPONSE" | grep -q "error\|Error\|ERROR"; then
+        # Extract the HTTP status code (last line of response)
+        HTTP_STATUS="${RESPONSE: -3}"
+        # Extract the response body (everything except last 3 characters)
+        RESPONSE_BODY="${RESPONSE:0:${#RESPONSE}-3}"
+
+        # Clean up temporary file
+        rm -f "${HEADER_FILE}"
+
+        # Check HTTP status code first
+        if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            success=true
+            style_header "✓ Successfully registered ComfyUI Agent with AI Server"
+            return 0
+        else
+            echo "HTTP Status Code: $HTTP_STATUS"
             echo "Error registering media provider with AI Server:"
-            echo "$RESPONSE"
+            echo "$RESPONSE_BODY"
+
+            # Additional error details based on status code
+            case $HTTP_STATUS in
+                401)
+                    echo "Authentication failed. Please check your credentials."
+                    ;;
+                404)
+                    echo "API endpoint not found. Please verify the server URL."
+                    ;;
+                500)
+                    echo "Server internal error occurred."
+                    ;;
+            esac
+
             gum style \
                 --foreground="#FFA500" \
                 --align center \
                 --width 50 \
                 "Please check your server URL and credentials and try again"
             echo
-        else
-            success=true
-            style_header "✓ Successfully registered ComfyUI Agent with AI Server"
-            return 0
         fi
     done
 }
