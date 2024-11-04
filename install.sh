@@ -243,6 +243,28 @@ EOF
     done
 }
 
+# Helper functions for array operations
+get_model_id() {
+    local name="$1"
+    local i
+    for i in "${!MENU_NAMES[@]}"; do
+        if [ "${MENU_NAMES[$i]}" = "$name" ]; then
+            echo "${MENU_IDS[$i]}"
+            return
+        fi
+    done
+}
+
+get_comfy_api_model() {
+    local id="$1"
+    local i
+    for i in "${!COMFY_MODEL_IDS[@]}"; do
+        if [ "${COMFY_MODEL_IDS[$i]}" = "$id" ]; then
+            echo "${COMFY_API_MODEL_NAMES[$i]}"
+            return
+        fi
+    done
+}
 
 persist_models_config() {
     # Path to local JSON file
@@ -285,9 +307,14 @@ setup_agent_comfy() {
 
     # Create arrays to store menu options and their corresponding values
     declare -a MENU_OPTIONS
-    declare -A MODEL_MAPPINGS
-    declare -A COMFY_API_MODELS
     declare -a HF_TOKEN_REQUIRED
+
+    # Use parallel arrays for MODEL_MAPPINGS
+    MENU_NAMES=()
+    MENU_IDS=()
+    # Use parallel arrays for COMFY_API_MODELS
+    COMFY_MODEL_IDS=()
+    COMFY_API_MODEL_NAMES=()
 
     # Parse JSON and populate arrays
     while IFS= read -r line; do
@@ -300,11 +327,14 @@ setup_agent_comfy() {
 
             if [ -n "$name" ] && [ -n "$id" ]; then
                 MENU_OPTIONS+=("$name")
-                MODEL_MAPPINGS["$name"]="$id"
+                # Add to parallel arrays instead of associative array
+                MENU_NAMES+=("$name")
+                MENU_IDS+=("$id")
 
                 # Store ComfyUI API model if it exists
                 if [ -n "$comfy_model" ]; then
-                    COMFY_API_MODELS["$id"]="$comfy_model"
+                    COMFY_MODEL_IDS+=("$id")
+                    COMFY_API_MODEL_NAMES+=("$comfy_model")
                 fi
 
                 # Check if this model requires HF_TOKEN
@@ -316,7 +346,10 @@ setup_agent_comfy() {
     done < <(jq -c '.[]' "./data/config/models.json")
 
     # Get user selections
-    mapfile -t SELECTED_OPTIONS < <(gum choose --no-limit --height 10 --cursor.foreground="#FFA500" "${MENU_OPTIONS[@]}")
+    SELECTED_OPTIONS=()
+    while IFS= read -r option; do
+        SELECTED_OPTIONS+=("$option")
+    done < <(gum choose --no-limit --height 10 --cursor.foreground="#FFA500" "${MENU_OPTIONS[@]}")
 
     # Exit if no selection
     if [ ${#SELECTED_OPTIONS[@]} -eq 0 ] || [ -z "${SELECTED_OPTIONS[0]}" ]; then
@@ -331,18 +364,20 @@ setup_agent_comfy() {
     # Flag to track if any selected model requires HF_TOKEN
     NEEDS_HF_TOKEN=false
 
+    # Process selections
     for option in "${SELECTED_OPTIONS[@]}"; do
         option=$(echo "$option" | xargs)  # Trim whitespace
 
         # Add to DEFAULT_MODELS
         [ -n "$SELECTED_MODEL_IDS" ] && SELECTED_MODEL_IDS+=","
-        SELECTED_MODEL_IDS+="${MODEL_MAPPINGS[$option]}"
+        model_id=$(get_model_id "$option")
+        SELECTED_MODEL_IDS+="$model_id"
 
         # Add to API_MODELS if it has ComfyUI configuration
-        model_id="${MODEL_MAPPINGS[$option]}"
-        if [ -n "${COMFY_API_MODELS[$model_id]}" ]; then
+        comfy_model=$(get_comfy_api_model "$model_id")
+        if [ -n "$comfy_model" ]; then
             [ -n "$SELECTED_API_MODELS" ] && SELECTED_API_MODELS+=","
-            SELECTED_API_MODELS+="${COMFY_API_MODELS[$model_id]}"
+            SELECTED_API_MODELS+="$comfy_model"
         fi
 
         # Check if this model requires HF_TOKEN
