@@ -1,7 +1,26 @@
 #!/bin/bash
 
+# Initialize verbose flag
+VERBOSE=false
+
+# Process command line arguments
+while getopts "v" opt; do
+    case $opt in
+        v) VERBOSE=true ;;
+        *) echo "Usage: $0 [-v]" >&2
+           exit 1 ;;
+    esac
+done
+
+# Helper function for verbose logging
+log() {
+    if [ "$VERBOSE" = true ]; then
+        echo "$1"
+    fi
+}
+
 check_prerequisites() {
-    echo "Checking prerequisites..."
+    log "Checking prerequisites..."
 
     # Check if Docker is installed
     if ! command -v docker &> /dev/null; then
@@ -18,15 +37,15 @@ check_prerequisites() {
         exit 1
     fi
 
-    echo "Prerequisites check passed. Docker and Docker Compose are installed."
+    log "Prerequisites check passed. Docker and Docker Compose are installed."
 }
 
 install_gum() {
-    echo "Installing gum..."
+    log "Installing gum..."
 
     # Check if gum is already installed
     if command -v gum &> /dev/null; then
-        echo "gum is already installed."
+        log "gum is already installed."
         return
     fi
 
@@ -72,17 +91,17 @@ gpgkey=https://repo.charm.sh/yum/gpg.key' | sudo tee /etc/zypp/repos.d/charm.rep
             # Arch Linux
             sudo pacman -S gum
         else
-            echo "Unsupported Linux distribution. Attempting to install using Go..."
+            log "Unsupported Linux distribution. Attempting to install using Go..."
             install_using_go
         fi
     else
-        echo "Unsupported operating system. Attempting to install using Go..."
+        log "Unsupported operating system. Attempting to install using Go..."
         install_using_go
     fi
 
     # Verify installation
     if command -v gum &> /dev/null; then
-        echo "gum has been successfully installed."
+        log "gum has been successfully installed."
     else
         echo "Failed to install gum. Please try manual installation."
         exit 1
@@ -161,8 +180,28 @@ configure_server_and_register() {
         DEFAULT_SERVER_URL=${AI_SERVER_URL:-"http://localhost:5006"}
         AI_SERVER_URL=$(get_input "Enter the URL where your AI Server is running." "$DEFAULT_SERVER_URL" "" "http://your-server:5006")
 
+        if [ -z "$AI_SERVER_URL" ]; then
+            if gum confirm "AI Server URL is empty. Do you want to exit?"; then
+                exit 0
+            elif test $? -eq 130; then
+                exit 0
+            else
+                continue
+            fi
+        fi
+
         DEFAULT_AUTH=${AI_SERVER_API_KEY:-$AI_SERVER_AUTH_SECRET}
         SERVER_AUTH=$(get_input "Enter your AI Server authentication credentials." "$DEFAULT_AUTH" "true" "Enter AI Server Auth Secret")
+
+        if [ -z "$SERVER_AUTH" ]; then
+            if gum confirm "AI Server Auth Secret is empty. Do you want to exit?"; then
+                exit 0
+            elif test $? -eq 130; then
+                exit 0
+            else
+                continue
+            fi
+        fi
 
         # Prepare API request
         # Convert API models string to array and format for JSON
@@ -413,13 +452,39 @@ setup_agent_comfy() {
     style_header "ComfyUI Agent Configuration"
     DEFAULT_AGENT_URL=${AGENT_URL:-"http://localhost:7860"}
     AGENT_URL=$(get_input "Enter the URL where this ComfyUI Agent will be accessible." "$DEFAULT_AGENT_URL" "" "http://your-agent:7860")
+
+    if [ -z "$AGENT_URL" ]; then
+        if gum confirm "Agent URL is empty. Do you want to exit?"; then
+            exit 0
+        elif test $? -eq 130; then
+            exit 0
+        else
+            AGENT_URL="http://localhost:7860"
+        fi
+    fi
+
     AGENT_PASSWORD=$(get_input "Create a password to secure your ComfyUI Agent." "" "true" "Enter a secure password")
 
-    # Save agent configuration
-    write_env "AGENT_PASSWORD" "$AGENT_PASSWORD"
+    if [ -z "$AGENT_PASSWORD" ]; then
+        if gum confirm "Agent password is empty. Do you want to exit?"; then
+            exit 0
+        elif test $? -eq 130; then
+            exit 0
+        else
+            AGENT_PASSWORD=""
+        fi
+    fi
 
-    # Configure server and register agent (will retry on failure)
-    configure_server_and_register "$SELECTED_MODEL_IDS" "$SELECTED_API_MODELS" "$AGENT_URL" "$AGENT_PASSWORD"
+    if [ "$AGENT_PASSWORD" = "" ]; then
+        echo "Warning: The ComfyUI Agent will not be secured with a password."
+    else
+        # Save agent configuration
+        write_env "AGENT_PASSWORD" "$AGENT_PASSWORD"
+    fi
+
+    if gum confirm "Do you want to register the ComfyUI Agent with the AI Server?"; then
+        configure_server_and_register "$SELECTED_MODEL_IDS" "$SELECTED_API_MODELS" "$AGENT_URL" "$AGENT_PASSWORD"
+    fi
 
     # Create ai-services network if it doesn't exist
     docker network create ai-services &> /dev/null || true
@@ -430,6 +495,7 @@ setup_agent_comfy() {
     docker compose up -d
 
     style_header "Agent starting... Selected models will be downloaded on first run. This can take a while depending on your internet connection."
+    echo "You can check the status of the agent by running 'docker compose logs'"
 }
 
 # Run the prerequisites check function
