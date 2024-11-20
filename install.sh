@@ -37,7 +37,18 @@ check_prerequisites() {
         exit 1
     fi
 
-    log "Prerequisites check passed. Docker and Docker Compose are installed."
+    # Check if jq is installed, install if not present
+    if ! command -v jq &> /dev/null; then
+        log "jq is not installed. Installing jq..."
+        sudo apt-get update && sudo apt-get install -y jq
+        if ! command -v jq &> /dev/null; then
+            echo "Failed to install jq. Please install it manually."
+            exit 1
+        fi
+        log "jq has been successfully installed."
+    fi
+
+    log "Prerequisites check passed. Docker, Docker Compose, and jq are installed."
 }
 
 install_gum() {
