@@ -176,14 +176,7 @@ check_comfy_status() {
 configure_server_and_register() {
     local selected_model_ids="$1"
     local selected_api_models="$2"
-    local agent_url="$3"
-    local agent_password="$4"
     local success=false
-
-    # Extract domain from agent_url
-    # Split on // and take everything after it
-    local domain=$(echo "$agent_url" | sed 's|.*//||')
-    local agent_name="ComfyUI Agent - ${domain}"
 
     while [ "$success" = false ]; do
         # Server configuration
@@ -213,6 +206,47 @@ configure_server_and_register() {
                 continue
             fi
         fi
+
+        # Agent configuration
+        style_header "ComfyUI Agent Configuration"
+        DEFAULT_AGENT_URL=${AGENT_URL:-"http://localhost:7860"}
+        AGENT_URL=$(get_input "Enter the URL where this ComfyUI Agent will be accessible." "$DEFAULT_AGENT_URL" "" "http://your-agent:7860")
+
+        if [ -z "$AGENT_URL" ]; then
+            if gum confirm "Agent URL is empty. Do you want to exit?"; then
+                exit 0
+            elif test $? -eq 130; then
+                exit 0
+            else
+                AGENT_URL="http://localhost:7860"
+            fi
+        fi
+
+        AGENT_PASSWORD=$(get_input "Create a password to secure your ComfyUI Agent." "" "true" "Enter a secure password")
+
+        if [ -z "$AGENT_PASSWORD" ]; then
+            if gum confirm "Agent password is empty. Do you want to exit?"; then
+                exit 0
+            elif test $? -eq 130; then
+                exit 0
+            else
+                AGENT_PASSWORD=""
+            fi
+        fi
+
+        if [ "$AGENT_PASSWORD" = "" ]; then
+            echo "Warning: The ComfyUI Agent will not be secured with a password."
+        else
+            # Save agent configuration
+            write_env "AGENT_PASSWORD" "$AGENT_PASSWORD"
+        fi
+
+        # Extract domain from agent_url
+        # Split on // and take everything after it
+        local domain=$(echo "$agent_url" | sed 's|.*//||')
+        local agent_name="ComfyUI Agent - ${domain}"
+        local agent_url="${AGENT_URL}"
+        local agent_password="${AGENT_PASSWORD}"
 
         # Prepare API request
         # Convert API models string to array and format for JSON
@@ -461,40 +495,6 @@ setup_agent_comfy() {
     fi
 
     echo "Note: Selected models will be downloaded on first run. This can take a while depending on your internet connection."
-
-    # Agent configuration
-    style_header "ComfyUI Agent Configuration"
-    DEFAULT_AGENT_URL=${AGENT_URL:-"http://localhost:7860"}
-    AGENT_URL=$(get_input "Enter the URL where this ComfyUI Agent will be accessible." "$DEFAULT_AGENT_URL" "" "http://your-agent:7860")
-
-    if [ -z "$AGENT_URL" ]; then
-        if gum confirm "Agent URL is empty. Do you want to exit?"; then
-            exit 0
-        elif test $? -eq 130; then
-            exit 0
-        else
-            AGENT_URL="http://localhost:7860"
-        fi
-    fi
-
-    AGENT_PASSWORD=$(get_input "Create a password to secure your ComfyUI Agent." "" "true" "Enter a secure password")
-
-    if [ -z "$AGENT_PASSWORD" ]; then
-        if gum confirm "Agent password is empty. Do you want to exit?"; then
-            exit 0
-        elif test $? -eq 130; then
-            exit 0
-        else
-            AGENT_PASSWORD=""
-        fi
-    fi
-
-    if [ "$AGENT_PASSWORD" = "" ]; then
-        echo "Warning: The ComfyUI Agent will not be secured with a password."
-    else
-        # Save agent configuration
-        write_env "AGENT_PASSWORD" "$AGENT_PASSWORD"
-    fi
 
     if gum confirm "Do you want to register the ComfyUI Agent with the AI Server?"; then
         configure_server_and_register "$SELECTED_MODEL_IDS" "$SELECTED_API_MODELS" "$AGENT_URL" "$AGENT_PASSWORD"
