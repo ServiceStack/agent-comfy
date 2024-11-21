@@ -100,15 +100,27 @@ async def engines_list(request):
 
 @web.middleware
 async def simple_api_key_auth(request, handler):
-    # Check if an Authorization header is present
-    if 'Authorization' not in request.headers:
-        return web.json_response({'error': 'Authorization header required'}, status=401)
-    # Check if Bearer token is used
-    if not request.headers['Authorization'].startswith('Bearer '):
-        return web.json_response({'error': 'Bearer token required'}, status=401)
-    # Check if the token is valid
-    if request.headers['Authorization'] != 'Bearer ' + os.getenv('AGENT_PASSWORD'):
-        return web.json_response({'error': 'Invalid token'}, status=401)
+    auth_token = os.getenv('AGENT_PASSWORD')
+    is_authorized = False
+
+    # Check Authorization header (Bearer token)
+    if 'Authorization' in request.headers:
+        auth_header = request.headers['Authorization']
+        if auth_header.startswith('Bearer '):
+            if auth_header == f'Bearer {auth_token}':
+                is_authorized = True
+
+    # Check apiKey query parameter if not already authorized
+    if not is_authorized and 'apiKey' in request.query:
+        if request.query['apiKey'] == auth_token:
+            is_authorized = True
+
+    # Return error if neither authentication method succeeded
+    if not is_authorized:
+        return web.json_response({
+            'error': 'Authentication required. Provide either a Bearer token in Authorization header or apiKey query parameter'
+        }, status=401)
+
     return await handler(request)
 
 
