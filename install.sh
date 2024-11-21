@@ -238,7 +238,7 @@ EOF
         echo "Content-Type: application/json"
         echo "Authorization: Bearer ********"
         echo "Request body:"
-        echo "$REQUEST_JSON"
+        log "$REQUEST_JSON"
 
         # Create a temporary file for headers
         HEADER_FILE=$(mktemp)
