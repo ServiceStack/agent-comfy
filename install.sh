@@ -448,7 +448,10 @@ setup_agent_comfy() {
         gum style --foreground="#CCCCCC" "One or more selected models require a HuggingFace access token."
         gum style --foreground="#888888" "You can get your token at https://huggingface.co/settings/tokens"
 
-        HF_TOKEN=$(get_input "Please enter your HuggingFace access token:" "" "true" "Enter your HuggingFace token")
+        # Get existing token from environment if it exists
+        EXISTING_TOKEN="${HF_TOKEN:-}"
+
+        HF_TOKEN=$(get_input "Please enter your HuggingFace access token:" "$EXISTING_TOKEN" "true" "Enter your HuggingFace token")
         if [ -n "$HF_TOKEN" ]; then
             write_env "HF_TOKEN" "$HF_TOKEN"
         else
