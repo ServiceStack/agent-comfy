@@ -102,9 +102,6 @@ async def engines_list(request):
 async def simple_api_key_auth(request, handler):
     # Allow paths that aren't /prompt or don't start with /api
     path = request.path
-    restrict_apis_only = os.getenv('RESTRICT_APIS_ONLY', 'false').lower() == 'true'
-    if path != '/prompt' and not path.startswith('/api/prompt') and restrict_apis_only:
-        return await handler(request)
 
     auth_token = os.getenv('AGENT_PASSWORD')
     is_authorized = False
@@ -120,6 +117,11 @@ async def simple_api_key_auth(request, handler):
     if not is_authorized and 'apiKey' in request.query:
         if request.query['apiKey'] == auth_token:
             is_authorized = True
+
+
+    restrict_apis_only = os.getenv('RESTRICT_APIS_ONLY', 'false').lower() == 'true'
+    if path != '/prompt' and not path.startswith('/api/prompt') and restrict_apis_only and is_authorized is False:
+        is_authorized = True
 
     # Return error if neither authentication method succeeded
     if not is_authorized:
