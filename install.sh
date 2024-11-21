@@ -194,6 +194,9 @@ configure_server_and_register() {
             fi
         fi
 
+        # Trim trailing slash if present
+        AI_SERVER_URL="${AI_SERVER_URL%/}"
+
         DEFAULT_AUTH=${AI_SERVER_API_KEY:-$AI_SERVER_AUTH_SECRET}
         SERVER_AUTH=$(get_input "Enter your AI Server authentication credentials." "$DEFAULT_AUTH" "true" "Enter AI Server Auth Secret")
 
@@ -221,6 +224,9 @@ configure_server_and_register() {
                 AGENT_URL="http://localhost:7860"
             fi
         fi
+
+        # Trim trailing slash if present
+        AGENT_URL="${AGENT_URL%/}"
 
         AGENT_PASSWORD=$(get_input "Create a password to secure your ComfyUI Agent." "" "true" "Enter a secure password")
 
