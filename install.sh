@@ -243,9 +243,9 @@ configure_server_and_register() {
 
         # Extract domain from agent_url
         # Split on // and take everything after it
+        local agent_url="${AGENT_URL}"
         local domain=$(echo "$agent_url" | sed 's|.*//||')
         local agent_name="ComfyUI Agent - ${domain}"
-        local agent_url="${AGENT_URL}"
         local agent_password="${AGENT_PASSWORD}"
 
         # Prepare API request
