@@ -100,6 +100,12 @@ async def engines_list(request):
 
 @web.middleware
 async def simple_api_key_auth(request, handler):
+    # Allow paths that aren't /prompt or don't start with /api
+    path = request.path
+    restrict_apis_only = os.getenv('RESTRICT_APIS_ONLY', 'false').lower() == 'true'
+    if path != '/prompt' and not path.startswith('/api') and restrict_apis_only:
+        return await handler(request)
+
     auth_token = os.getenv('AGENT_PASSWORD')
     is_authorized = False
 
