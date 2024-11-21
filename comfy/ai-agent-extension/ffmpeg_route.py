@@ -63,17 +63,20 @@ async def transform(request):
                 if input_path:
                     files[file_type] = input_path
                 else:
+                    logging.error(f'Invalid file type for {file_type}')
                     return web.json_response({'error': f'Invalid file type for {file_type}'}, status=400)
             else:
                 # It's form data
                 form_data[part.name] = await part.text()
 
         if not files:
+            logging.error('No valid files provided')
             return web.json_response({'error': 'No valid files provided'}, status=400)
 
         # Determine the base filename for output
         base_filename = next((files[ft] for ft in ['video', 'audio', 'image', 'watermark'] if ft in files), None)
         if not base_filename:
+            logging.error('No valid input file found')
             return web.json_response({'error': 'No valid input file found'}, status=400)
 
         output_filename = f"output_{os.path.basename(base_filename)}"
