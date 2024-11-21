@@ -40,6 +40,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
   pip install -r requirements.txt && \
   rm -rf ${ROOT}/input ${ROOT}/output ${ROOT}/custom_nodes ${ROOT}/models
 
+# HACK, we want to include apiKey in the prompt call if it is present
+RUN sed -i 's/= this.user;/= this.user; if (localStorage.apikey) options3.headers.Authorization=`Bearer ${localStorage.apikey}`;/' ${ROOT}/web/assets/index-CgU1oKZt.js
+
 # Fix for binding port issue
 RUN pip install yarl==1.12.1
 
