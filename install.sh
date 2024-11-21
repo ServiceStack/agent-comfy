@@ -497,7 +497,7 @@ setup_agent_comfy() {
     echo "Note: Selected models will be downloaded on first run. This can take a while depending on your internet connection."
 
     if gum confirm "Do you want to register the ComfyUI Agent with the AI Server?"; then
-        configure_server_and_register "$SELECTED_MODEL_IDS" "$SELECTED_API_MODELS" "$AGENT_URL" "$AGENT_PASSWORD"
+        configure_server_and_register "$SELECTED_MODEL_IDS" "$SELECTED_API_MODELS"
     fi
 
     # Create ai-services network if it doesn't exist
