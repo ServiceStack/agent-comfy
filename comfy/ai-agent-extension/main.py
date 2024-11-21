@@ -119,7 +119,7 @@ async def simple_api_key_auth(request, handler):
             is_authorized = True
 
 
-    restrict_apis_only = os.getenv('RESTRICT_APIS_ONLY', 'false').lower() == 'true'
+    restrict_apis_only = os.getenv('RESTRICT_APIS_ONLY', 'true').lower() == 'true'
     if path != '/prompt' and not path.startswith('/api/prompt') and restrict_apis_only and is_authorized is False:
         is_authorized = True
 
