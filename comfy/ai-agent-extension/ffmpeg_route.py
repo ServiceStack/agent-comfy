@@ -5,13 +5,13 @@ import os
 import hashlib
 import logging
 
-# server comes from comfyui, only import if present
+# server comes from ComfyUI, only import if present
 try:
     import server
     import folder_paths
 except ImportError:
     # throw error if server is not present
-    raise ImportError('ComfyUI `server` not found, extension requires comfyui to run.')
+    raise ImportError('ComfyUI `server` not found, extension requires ComfyUI to run.')
 
 prompt_server = server.PromptServer.instance
 app = prompt_server.app
@@ -26,7 +26,15 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav', 'mp4', 'avi', 'mov', 'webm'}
+    allowed_extensions = {
+        # Image formats
+        'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp',
+        # Video formats
+        'mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'webm', 'mpeg', '3gp',
+        # Audio formats
+        'mp3', 'wav', 'aac', 'flac', 'ogg', 'm4a', 'wma'
+    }
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
 
 def save_file(file_content, filename):
@@ -91,6 +99,12 @@ async def transform(request):
         if 'format' in output_options:
             #replace extension with format in output_path
             output_path = output_path.split('.')[0] + '.' + output_options['format']
+            
+        # Log all the paths and options
+        logging.info(f"Input files: video:{files.get('video')}, audio:{files.get('audio')}, image:{files.get('image')}, watermark:{files.get('watermark')}")
+        logging.info(f"Input kwargs: {input_kwargs}")
+        logging.info(f"Output kwargs: {output_kwargs}")
+        logging.info(f"Output path: {output_path}")
 
         dto = MediaTransformDTO(
             video_path=files.get('video'),

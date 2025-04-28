@@ -2,6 +2,7 @@ from typing import Optional
 
 import ffmpeg
 from dataclasses import dataclass
+import logging
 
 
 @dataclass
@@ -20,7 +21,20 @@ def transform_media(dto: MediaTransformDTO) -> bool:
         # Start with the video input if available
         if dto.video_path:
             video_stream = ffmpeg.input(dto.video_path, **(dto.input_kwargs or {}))
-            audio_stream = video_stream.audio  # Preserve original audio
+            # Safely attempt to get audio stream
+            try:
+                # Try to probe the input file to check if it has an audio stream
+                probe = ffmpeg.probe(dto.video_path)
+                audio_streams = [stream for stream in probe['streams'] if stream['codec_type'] == 'audio']
+                
+                if audio_streams:
+                    audio_stream = video_stream.audio  # Only get audio if it exists
+                else:
+                    audio_stream = None
+            except Exception:
+                # If probing fails or any other error occurs, assume no audio
+                audio_stream = None
+                
         elif dto.audio_path:
             audio_stream = ffmpeg.input(dto.audio_path, **(dto.input_kwargs or {}))
             video_stream = None
@@ -59,9 +73,15 @@ def transform_media(dto: MediaTransformDTO) -> bool:
             output = ffmpeg.output(*output_streams, dto.output_path, **(dto.output_kwargs or {}))
 
         # Run FFmpeg command
-        ffmpeg.run(output, overwrite_output=True)
+        out, e = ffmpeg.run(output, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+
+        logging.info('stdout: %s', out.decode('utf8'))
+        if e:
+            logging.error('stderr: %s', e.decode('utf8'))
 
         return True
     except ffmpeg.Error as e:
-        print(f"An error occurred: {e.stderr.decode()}")
+        logging.error('FFmpeg error:  %s', e)
+        logging.info('stdout: %s', e.stdout.decode('utf8'))
+        logging.error('stderr: %s', e.stderr.decode('utf8'))
         return False
