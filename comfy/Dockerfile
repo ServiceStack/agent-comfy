@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive PIP_PREFER_BINARY=1
 RUN apt-get update && \
@@ -35,13 +35,17 @@ RUN echo "Downloading text to speech support extension..." && \
 
 # Clone and setup ComfyUI
 RUN --mount=type=cache,target=/root/.cache/pip \
-  git clone --depth 1 --branch v0.2.5 https://github.com/comfyanonymous/ComfyUI.git ${ROOT} && \
+  git clone --depth 1 --branch v0.3.30 https://github.com/comfyanonymous/ComfyUI.git ${ROOT} && \
   cd ${ROOT} && \
-  pip install -r requirements.txt && \
-  rm -rf ${ROOT}/input ${ROOT}/output ${ROOT}/custom_nodes ${ROOT}/models
+  ## Use latest torch and torchvision
+  sed -i 's/^torch$/torch~=2.7.0/' requirements.txt && \
+  sed -i 's/^torchvision$/torchvision~=0.22.0/' requirements.txt && \
+  sed -i 's/^torchaudio$/torchaudio~=2.7.0/' requirements.txt && \
+  pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128 && \
+  rm -rf ${ROOT}/input ${ROOT}/output ${ROOT}/custom_nodes ${ROOT}/models  
 
 # HACK, we want to include apiKey in the prompt call if it is present
-RUN sed -i 's/= this.user;/= this.user; if (localStorage.apikey) options3.headers.Authorization=`Bearer ${localStorage.apikey}`;/' ${ROOT}/web/assets/index-CgU1oKZt.js
+RUN sed -i 's/= this.user;/= this.user; if (localStorage.apikey) options2.headers.Authorization=`Bearer ${localStorage.apikey}`;/' $(python -c "import sysconfig; print(sysconfig.get_path('purelib'))")/comfyui_frontend_package/static/assets/index-CJpGM-n7.js
 
 # Fix for binding port issue
 RUN pip install yarl==1.12.1
@@ -54,7 +58,8 @@ RUN ln -sT /data/input ${ROOT}/input && \
 WORKDIR ${ROOT}
 COPY . /docker/
 COPY ./ai-agent-extension ${DATA}/custom_nodes/ai-agent-extension
-RUN pip install -r ${DATA}/custom_nodes/ai-agent-extension/requirements.txt
+RUN pip install -r ${DATA}/custom_nodes/ai-agent-extension/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
+
 RUN chmod u+x /docker/init_models.sh
 RUN chmod u+x /docker/entrypoint.sh && cp /docker/extra_model_paths.yaml ${ROOT}
 # Create directories
