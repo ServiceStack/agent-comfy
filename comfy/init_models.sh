@@ -67,6 +67,15 @@ download_model() {
     # Execute the curl command
     eval $curl_cmd
 
+    # Check if file size is greater than 512 bytes
+    if [[ -f "$full_path" && $(stat -c%s "$full_path") -le 512 ]]; then
+        echo "Failed to download $filename:"
+        # Echo contents of the file
+        cat "$full_path"; echo
+        rm -f "$full_path"
+        return
+    fi
+
     if [ $? -eq 0 ]; then
         echo "Successfully downloaded $filename to $path"
     else
