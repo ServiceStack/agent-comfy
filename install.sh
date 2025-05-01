@@ -408,12 +408,12 @@ setup_agent_comfy() {
 
     # Parse JSON and populate arrays
     while IFS= read -r line; do
-        if [[ $line == *"installer"* ]] && [[ $line == *"name"* ]]; then
+        if [[ $line == *"installer"* ]]; then
             # Extract installer name and corresponding model ID
-            name=$(echo "$line" | jq -r '.installer.name')
+            name=$(echo "$line" | jq -r '.installer')
             id=$(echo "$line" | jq -r '.id')
             comfy_model=$(echo "$line" | jq -r '.apiModels.ComfyUI // empty')
-            download_api_key_var=$(echo "$line" | jq -r '.downloadApiKeyVar // empty')
+            download_token=$(echo "$line" | jq -r '.downloadToken // empty')
 
             if [ -n "$name" ] && [ -n "$id" ]; then
                 MENU_OPTIONS+=("$name")
@@ -428,7 +428,7 @@ setup_agent_comfy() {
                 fi
 
                 # Check if this model requires HF_TOKEN
-                if [ "$download_api_key_var" = "HF_TOKEN" ]; then
+                if [ "$download_token" = "HF_TOKEN" ]; then
                     HF_TOKEN_REQUIRED+=("$id")
                 fi
             fi
@@ -439,7 +439,7 @@ setup_agent_comfy() {
     SELECTED_OPTIONS=()
     while IFS= read -r option; do
         SELECTED_OPTIONS+=("$option")
-    done < <(gum choose --no-limit --height 10 --cursor.foreground="#FFA500" "${MENU_OPTIONS[@]}")
+    done < <(gum choose --no-limit --height 13 --cursor.foreground="#FFA500" "${MENU_OPTIONS[@]}")
 
     # Exit if no selection
     if [ ${#SELECTED_OPTIONS[@]} -eq 0 ] || [ -z "${SELECTED_OPTIONS[0]}" ]; then

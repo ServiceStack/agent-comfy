@@ -5,20 +5,24 @@ download_model() {
     local json="$1"
     local id=$(echo "$json" | jq -r '.id')
     local name=$(echo "$json" | jq -r '.name')
-    local filename=$(echo "$json" | jq -r '.filename')
     local path=$(echo "$json" | jq -r '.path')
     local download_url=$(echo "$json" | jq -r '.downloadUrl')
-    local download_api_key_var=$(echo "$json" | jq -r '.downloadApiKeyVar // empty')
+    local download_token=$(echo "$json" | jq -r '.downloadToken')
+
+    # Check if $COMFY_PATH_PREFIX is set
+    if [[ -n "$COMFY_PATH_PREFIX" ]]; then
+        # If set, join it with the path
+        # Check if path starts with a slash
+        if [[ "$path" == /* ]]; then
+            # If it starts with a slash, remove it
+            path="${path:1}"
+        fi
+        path="$COMFY_PATH_PREFIX/$path"
+    fi
 
     # Check if download_url is empty, null, or not set, skip if so
     if [[ -z "$download_url" || "$download_url" == "null" ]]; then
         echo "Skipping $name (ID: $id) - No download URL provided"
-        return
-    fi
-
-    # Check if filename is empty or null, skip if so
-    if [[ -z "$filename" || "$filename" == "null" ]]; then
-        echo "Skipping $name (ID: $id) - No filename provided"
         return
     fi
 
@@ -28,58 +32,55 @@ download_model() {
         return
     fi
 
-    # Check if file already exists
-    local full_path="${path}/${filename}"
-    if [[ -f "$full_path" ]]; then
-        echo "File $filename already exists in $path. Skipping download."
-        return
-    fi
-
-
-    # Check if file already exists
-    local full_path="${path}/${filename}"
-    if [[ -f "$full_path" ]]; then
-        echo "File $filename already exists in $path. Skipping download."
+    if [[ -f "$path" ]]; then
+        echo "File $path already exists. Skipping download."
         return
     fi
 
     echo "Downloading $name (ID: $id)"
 
     # Create directory if it doesn't exist
-    mkdir -p "$path"
+    
+    mkdir -p dir=$(dirname "$path")
 
     # Prepare curl command
     curl_cmd="curl -L"
 
     # Add authentication if required
-    if [[ -n "$download_api_key_var" ]]; then
-        api_key="${!download_api_key_var}"
-        if [[ -z "$api_key" ]]; then
-            echo "Error: Environment variable $download_api_key_var is not set or empty"
+    if [[ -n "$download_token" ]]; then
+        # Check if the token is an environment variable
+        if [[ "$download_token" == \$* ]]; then
+            # If the token starts with $, it's an environment variable
+            download_token="${download_token:1}"
+            # Get the value of the environment variable
+            token="${!download_token}"
+        fi
+        if [[ -z "$token" ]]; then
+            echo "Error: Environment variable $download_token is not set or empty"
             return
         fi
-        curl_cmd+=" -H 'Authorization: Bearer $api_key'"
+        curl_cmd+=" -H 'Authorization: Bearer $token'"
     fi
 
     # Add output file to curl command
-    curl_cmd+=" -o '$full_path' '$download_url'"
+    curl_cmd+=" -o '$path' '$download_url'"
 
     # Execute the curl command
     eval $curl_cmd
 
     # Check if file size is greater than 512 bytes
-    if [[ -f "$full_path" && $(stat -c%s "$full_path") -le 512 ]]; then
-        echo "Failed to download $filename:"
+    if [[ -f "$path" && $(stat -c%s "$path") -le 512 ]]; then
+        echo "Failed to download $download_url:"
         # Echo contents of the file
-        cat "$full_path"; echo
-        rm -f "$full_path"
+        cat "$path"; echo
+        rm -f "$path"
         return
     fi
 
     if [ $? -eq 0 ]; then
-        echo "Successfully downloaded $filename to $path"
+        echo "Successfully downloaded $path"
     else
-        echo "Failed to download $filename"
+        echo "Failed to download $download_url"
     fi
 }
 
@@ -93,7 +94,7 @@ resolve_dependencies() {
     resolved_models+=("$model_id")
 
     # Check for dependencies
-    local depends_on=$(echo "$all_models" | jq -r ".[] | select(.id == \"$model_id\") | .dependsOn[]?" 2>/dev/null)
+    local depends_on=$(echo "$all_models" | jq -r ".[] | select(.id == \"$model_id\") | .dependencies[]?" 2>/dev/null)
 
     if [[ -n "$depends_on" ]]; then
         for dep in $depends_on; do
@@ -107,6 +108,17 @@ resolve_dependencies() {
 # Path to local JSON file
 file="/data/config/models.json"
 url="https://raw.githubusercontent.com/ServiceStack/ai-server/main/AiServer/wwwroot/lib/data/media-models.json"
+
+# Check if $COMFY_PATH_PREFIX is set
+if [[ -n "$COMFY_PATH_PREFIX" ]]; then
+    # If set, join it with the path
+    # Check if path starts with a slash
+    if [[ "$file" == /* ]]; then
+        # If it starts with a slash, remove it
+        file="${file:1}"
+    fi
+    file="$COMFY_PATH_PREFIX/$file"
+fi
 
 # Check if file exists, if not download it
 if [ ! -f "$file" ]; then
