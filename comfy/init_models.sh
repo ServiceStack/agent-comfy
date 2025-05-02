@@ -41,7 +41,7 @@ download_model() {
 
     # Create directory if it doesn't exist
     
-    mkdir -p dir=$(dirname "$path")
+    mkdir -p "$(dirname "$path")"
 
     # Prepare curl command
     curl_cmd="curl -L"
