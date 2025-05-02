@@ -8,6 +8,7 @@ download_model() {
     local path=$(echo "$json" | jq -r '.path')
     local download_url=$(echo "$json" | jq -r '.downloadUrl')
     local download_token=$(echo "$json" | jq -r '.downloadToken')
+    local dependencies=$(echo "$json" | jq -r '.dependencies[]?')
 
     # Check if $COMFY_PATH_PREFIX is set
     if [[ -n "$COMFY_PATH_PREFIX" ]]; then
@@ -22,7 +23,12 @@ download_model() {
 
     # Check if download_url is empty, null, or not set, skip if so
     if [[ -z "$download_url" || "$download_url" == "null" ]]; then
-        echo "Skipping $name (ID: $id) - No download URL provided"
+
+        # Only print error if has no dependencies
+        if [[ -z "$dependencies" ]]; then
+            echo "Skipping $name (ID: $id) - No download URL provided"
+        fi
+
         return
     fi
 
@@ -94,10 +100,10 @@ resolve_dependencies() {
     resolved_models+=("$model_id")
 
     # Check for dependencies
-    local depends_on=$(echo "$all_models" | jq -r ".[] | select(.id == \"$model_id\") | .dependencies[]?" 2>/dev/null)
+    local dependencies=$(echo "$all_models" | jq -r ".[] | select(.id == \"$model_id\") | .dependencies[]?" 2>/dev/null)
 
-    if [[ -n "$depends_on" ]]; then
-        for dep in $depends_on; do
+    if [[ -n "$dependencies" ]]; then
+        for dep in $dependencies; do
             resolved_models+=($(resolve_dependencies "$dep" "$all_models"))
         done
     fi
