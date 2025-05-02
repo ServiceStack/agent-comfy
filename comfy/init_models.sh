@@ -53,7 +53,7 @@ download_model() {
     curl_cmd="curl -L"
 
     # Add authentication if required
-    if [[ -n "$download_token" ]]; then
+    if [[ -n "$download_token" && "$download_token" != "null" ]]; then
         # Check if the token is an environment variable
         if [[ "$download_token" == \$* ]]; then
             # If the token starts with $, it's an environment variable
