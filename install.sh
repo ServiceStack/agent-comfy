@@ -437,15 +437,20 @@ setup_agent_comfy() {
 
     # Get user selections
     SELECTED_OPTIONS=()
-    while IFS= read -r option; do
-        SELECTED_OPTIONS+=("$option")
-    done < <(gum choose --no-limit --height 13 --cursor.foreground="#FFA500" "${MENU_OPTIONS[@]}")
+    SELECTIONS=$(gum choose --no-limit --height 12 --cursor.foreground="#FFA500" "${MENU_OPTIONS[@]}")
+    if [ -n "$SELECTIONS" ]; then
+        # Use mapfile to read selections into array, handling both single and multiple selections
+        mapfile -t SELECTED_OPTIONS <<< "$SELECTIONS"
+    fi
+
+    # Debugging: Print selected options
+    # echo "Selected options: ${SELECTED_OPTIONS[*]}"
 
     # Exit if no selection
-    if [ ${#SELECTED_OPTIONS[@]} -eq 0 ] || [ -z "${SELECTED_OPTIONS[0]}" ]; then
-        echo "No functionality selected. Exiting setup."
-        exit 1
-    fi  # Changed from single-line syntax for clarity
+    if [ ${#SELECTED_OPTIONS[@]} -eq 0 ]; then
+        echo "No models selected. Exiting."
+        exit 0
+    fi
 
     # Process selections for DEFAULT_MODELS
     SELECTED_MODEL_IDS=""
