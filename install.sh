@@ -398,6 +398,7 @@ setup_agent_comfy() {
     # Create arrays to store menu options and their corresponding values
     declare -a MENU_OPTIONS
     declare -a HF_TOKEN_REQUIRED
+    declare -a CIVITAI_TOKEN_REQUIRED
 
     # Use parallel arrays for MODEL_MAPPINGS
     MENU_NAMES=()
@@ -427,9 +428,13 @@ setup_agent_comfy() {
                     COMFY_API_MODEL_NAMES+=("$comfy_model")
                 fi
 
-                # Check if this model requires HF_TOKEN
-                if [ "$download_token" = "HF_TOKEN" ]; then
+                # Check if this model requires $HF_TOKEN
+                if [[ "$download_token" == *"$HF_TOKEN"* ]]; then
                     HF_TOKEN_REQUIRED+=("$id")
+                fi
+                # Check if this model requires $CIVITAI_TOKEN
+                if [[ "$download_token" == *"$CIVITAI_TOKEN"* ]]; then
+                    CIVITAI_TOKEN_REQUIRED+=("$id")
                 fi
             fi
         fi
@@ -458,6 +463,7 @@ setup_agent_comfy() {
     SELECTED_API_MODELS=""
     # Flag to track if any selected model requires HF_TOKEN
     NEEDS_HF_TOKEN=false
+    NEEDS_CIVITAI_TOKEN=false
 
     # Process selections
     for option in "${SELECTED_OPTIONS[@]}"; do
@@ -482,6 +488,14 @@ setup_agent_comfy() {
                 break
             fi
         done
+
+        # Check if this model requires HF_TOKEN
+        for civitai_required in "${CIVITAI_TOKEN_REQUIRED[@]}"; do
+            if [ "$model_id" = "$civitai_required" ]; then
+                NEEDS_CIVITAI_TOKEN=true
+                break
+            fi
+        done
     done
 
     # Save selected models
@@ -501,6 +515,24 @@ setup_agent_comfy() {
             write_env "HF_TOKEN" "$HF_TOKEN"
         else
             echo "Error: HuggingFace token is required but was not provided."
+            exit 1
+        fi
+    fi
+
+    # If any selected model requires CIVITAI_TOKEN, prompt for it
+    if [ "$NEEDS_CIVITAI_TOKEN" = true ]; then
+        style_header "CivitAI API Key Required"
+        gum style --foreground="#CCCCCC" "One or more selected models require a CivitAI API Key."
+        gum style --foreground="#888888" "You can get your API Key at https://civitai.com/user/account"
+
+        # Get existing token from environment if it exists
+        EXISTING_TOKEN="${CIVITAI_TOKEN:-}"
+
+        CIVITAI_TOKEN=$(get_input "Please enter your CivitAI API Key:" "$EXISTING_TOKEN" "true" "Enter your CivitAI API Key")
+        if [ -n "$CIVITAI_TOKEN" ]; then
+            write_env "CIVITAI_TOKEN" "$CIVITAI_TOKEN"
+        else
+            echo "Error: CivitAI API Key is required but was not provided."
             exit 1
         fi
     fi
